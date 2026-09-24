@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MEB Maarif Modeli - Etkileşimli Yazı ve Çizim Asistanı</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Quicksand for high classroom legibility -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* MEB standard 4 notebook lines */
+    .line-ascender, .line-descender {
+      stroke: #ef4444; /* Boundary red */
+      stroke-width: 3.5;
+    }
+    .line-core-top, .line-core-base {
+      stroke: #2563eb; /* Primary writing blue */
+      stroke-width: 4;
+    }
+
+    /* Guide path underneath */
+    .ghost-stroke {
+      stroke: #cbd5e1;
+      stroke-width: 24;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      stroke-dasharray: 8 8;
+    }
+
+    /* Active ink stroke */
+    .active-ink {
+      stroke: #1e3a8a;
+      stroke-width: 26;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    /* Finished ink stroke */
+    .completed-ink {
+      stroke: #1e40af;
+      stroke-width: 26;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
+    /* Student Practice Canvas */
+    #practiceCanvas {
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .pencil-shadow {
+      filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+    }
+
+    .btn-press {
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-press:active {
+      transform: scale(0.93);
+    }
+
+    /* Custom scrollbar for horizontal character picker */
+    .hide-scrollbar::-webkit-scrollbar {
+      height: 6px;
+    }
+    .hide-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .hide-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .hide-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between overflow-x-hidden">
+
+  <!-- Header Bar -->
+  <header class="bg-white border-b-2 sm:border-b-4 border-indigo-200 shadow-sm px-3 py-2 sm:px-6 sm:py-3 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-2">
+      <!-- Title & Branding -->
+      <div class="flex items-center space-x-2.5 sm:space-x-3">
+        <div id="activeCharAvatar" class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-amber-400 via-rose-400 to-indigo-500 flex items-center justify-center text-white font-black text-xl sm:text-2xl shadow-sm sm:shadow-md border-2 border-white shrink-0">
+          a
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-lg md:text-xl font-black text-slate-800 tracking-tight leading-tight">
+            Etkileşimli Yazı Asistanı <span class="text-indigo-600 block sm:inline">| Dik Temel Harfler</span>
+          </h1>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <!-- Audio Toggle -->
+        <button id="audioToggleBtn" class="btn-press flex items-center justify-center gap-1.5 bg-amber-50 hover:bg-amber-100 border-2 border-amber-300 p-2 sm:px-3 sm:py-2 rounded-xl text-amber-900 font-bold text-xs sm:text-sm shadow-sm" title="Ses Açık/Kapalı">
+          <svg id="soundIcon" class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+          </svg>
+          <span class="hidden md:inline" id="soundLabel">Ses: Açık</span>
+        </button>
+
+        <!-- Fullscreen Toggle for Akıllı Tahta / Mobile -->
+        <button id="fullscreenBtn" class="btn-press flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 border-2 border-slate-300 p-2 sm:px-3 sm:py-2 rounded-xl text-slate-700 font-bold text-xs sm:text-sm shadow-sm" title="Tam Ekran">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+          </svg>
+          <span class="hidden md:inline">Tam Ekran</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Category & Character Navigation Bar -->
+  <section id="categoryNavSection" class="bg-white/95 backdrop-blur-md border-b border-indigo-200 py-2 px-2 sm:px-6 shadow-sm">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-center gap-2 sm:gap-5">
+      
+      <!-- Category Tabs -->
+      <div class="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl sm:rounded-2xl shrink-0">
+        <button data-cat="kucuk" class="cat-tab px-3 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-extrabold text-xs sm:text-sm bg-white text-indigo-700 shadow-sm transition-all text-center whitespace-nowrap">
+          Küçük
+        </button>
+        <button data-cat="buyuk" class="cat-tab px-3 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm text-slate-600 hover:text-slate-900 transition-all text-center whitespace-nowrap">
+          Büyük
+        </button>
+        <button data-cat="rakam" class="cat-tab px-3 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm text-slate-600 hover:text-slate-900 transition-all text-center whitespace-nowrap">
+          Rakam
+        </button>
+        <button data-cat="noktalama" class="cat-tab px-3 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm text-slate-600 hover:text-slate-900 transition-all text-center whitespace-nowrap">
+          Noktalama
+        </button>
+      </div>
+
+      <!-- Quick Prev / Next Navigator with Horizontal Strip -->
+      <div class="flex items-center gap-1.5 w-auto max-w-xl justify-center">
+        <button id="prevCharBtn" class="btn-press p-2 rounded-xl bg-slate-100 hover:bg-indigo-50 active:bg-indigo-100 text-indigo-700 border border-slate-300 shadow-sm shrink-0 touch-manipulation" title="Önceki (Sol Ok)">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+
+        <!-- Dynamic Character List Ribbon -->
+        <div id="characterRibbon" class="flex items-center gap-1.5 overflow-x-auto py-1 px-1 hide-scrollbar flex-1 scroll-smooth">
+          <!-- Populated by JS -->
+        </div>
+
+        <button id="nextCharBtn" class="btn-press p-2 rounded-xl bg-slate-100 hover:bg-indigo-50 active:bg-indigo-100 text-indigo-700 border border-slate-300 shadow-sm shrink-0 touch-manipulation" title="Sonraki (Sağ Ok)">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Main Interactive Display Zone -->
+  <main class="max-w-6xl w-full mx-auto px-2 sm:px-4 py-2 sm:py-3 flex-1 flex flex-col justify-center">
+
+    <!-- Guidelines zone info pill -->
+    <div id="guidanceBar" class="flex items-center justify-end mb-1 sm:mb-2 px-1 transition-all duration-200">
+      <div id="zoneInfoPill" class="flex items-center gap-1.5 bg-indigo-50 text-indigo-800 border border-indigo-200 text-[11px] sm:text-xs px-2.5 sm:px-3 py-1 rounded-xl font-bold">
+        <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+        <span id="zoneDescription">Orta Gövde Alanı (2 - 3. Çizgiler Arası)</span>
+      </div>
+    </div>
+
+    <!-- Notebook Board Container (4 Lines, 3 Intervals MEB Standard) -->
+    <div class="relative w-full bg-white rounded-3xl shadow-2xl border-4 border-slate-300 overflow-hidden" style="aspect-ratio: 16/9; max-height: 530px;">
+      
+      <!-- Primary SVG Writing Stage -->
+      <svg id="boardSvg" viewBox="0 0 1000 560" class="w-full h-full block">
+        <defs>
+          <pattern id="dotPattern" width="28" height="28" patternUnits="userSpaceOnUse">
+            <circle cx="14" cy="14" r="1.2" fill="#e2e8f0" />
+          </pattern>
+          
+          <!-- Direction marker arrowheads -->
+          <marker id="arrowRed" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#dc2626" />
+          </marker>
+          <marker id="arrowBlue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#2563eb" />
+          </marker>
+          <marker id="arrowEmerald" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#059669" />
+          </marker>
+        </defs>
+
+        <!-- Base Background Grid -->
+        <rect width="1000" height="560" fill="#ffffff" />
+        <rect width="1000" height="560" fill="url(#dotPattern)" />
+
+        <!-- NOTEBOOK BANDS (3 INTERVALS)
+             Line 1 (Top Ascender): Y = 90
+             Line 2 (Upper Core):   Y = 230
+             Line 3 (Base Core):    Y = 390
+             Line 4 (Descender):    Y = 510
+        -->
+
+        <!-- Dynamic Band Highlight Backgrounds -->
+        <!-- Upper Band: Y: 90 - 230 (Height: 140) -->
+        <rect id="bandUpper" x="0" y="90" width="1000" height="140" fill="#fef3c7" fill-opacity="0" class="transition-all duration-500" />
+        
+        <!-- Core Middle Band: Y: 230 - 390 (Height: 160) -->
+        <rect id="bandMiddle" x="0" y="230" width="1000" height="160" fill="#fef3c7" fill-opacity="0.65" class="transition-all duration-500" />
+        
+        <!-- Lower Descender Band: Y: 390 - 510 (Height: 120) -->
+        <rect id="bandLower" x="0" y="390" width="1000" height="120" fill="#fef3c7" fill-opacity="0" class="transition-all duration-500" />
+
+        <!-- Zone Labels on Left Edge for Students & Teachers -->
+        <g id="zoneLabels" class="opacity-75">
+          <text x="24" y="165" fill="#94a3b8" font-size="14" font-weight="700">Üst Aralık</text>
+          <text x="24" y="315" fill="#d97706" font-size="15" font-weight="800">Orta Aralık (Gövde)</text>
+          <text x="24" y="455" fill="#94a3b8" font-size="14" font-weight="700">Alt Aralık (Kuyruk)</text>
+        </g>
+
+        <!-- MEB Standard 4 Horizontal Lines -->
+        <line x1="10" y1="90" x2="990" y2="90" class="line-ascender" stroke-dasharray="10 6"/>
+        <line x1="10" y1="230" x2="990" y2="230" class="line-core-top" />
+        <line x1="10" y1="390" x2="990" y2="390" class="line-core-base" />
+        <line x1="10" y1="510" x2="990" y2="510" class="line-descender" stroke-dasharray="10 6"/>
+
+        <!-- Line Numbers on Right Edge -->
+        <g fill="#64748b" font-size="13" font-weight="bold" text-anchor="middle">
+          <circle cx="975" cy="90" r="11" fill="#fee2e2"/>
+          <text x="975" y="94" fill="#dc2626">1</text>
+          
+          <circle cx="975" cy="230" r="11" fill="#dbeafe"/>
+          <text x="975" y="234" fill="#1e40af">2</text>
+          
+          <circle cx="975" cy="390" r="11" fill="#dbeafe"/>
+          <text x="975" y="394" fill="#1e40af">3</text>
+          
+          <circle cx="975" cy="510" r="11" fill="#fee2e2"/>
+          <text x="975" y="514" fill="#dc2626">4</text>
+        </g>
+
+        <!-- DYNAMIC CHARACTER SVG LAYERS -->
+        <!-- Layer 1: Dashed Ghost template -->
+        <g id="ghostGroup"></g>
+
+        <!-- Layer 2: Completed and active animated strokes -->
+        <g id="inkGroup"></g>
+
+        <!-- Layer 3: Direction numbers and instructional arrows -->
+        <g id="guidesGroup"></g>
+
+        <!-- Layer 4: Real-time Moving Pencil Tracer -->
+        <g id="pencilTracer" class="pencil-shadow" transform="translate(0, 0)" style="display: none;">
+          <!-- 3D style wooden pencil -->
+          <g transform="rotate(-40) translate(-7, -68)">
+            <!-- Main pencil body -->
+            <polygon points="0,20 18,20 18,60 0,60" fill="#f59e0b" />
+            <rect x="6" y="20" width="6" height="40" fill="#fbbf24" />
+            <!-- Eraser ferrule -->
+            <rect x="0" y="12" width="18" height="8" fill="#cbd5e1" />
+            <path d="M 0,12 C 0,5 18,5 18,12 Z" fill="#f43f5e" />
+            <!-- Wood tip -->
+            <polygon points="0,60 18,60 9,76" fill="#fde68a" />
+            <!-- Graphite lead tip -->
+            <polygon points="6,71 12,71 9,76" fill="#1e293b" />
+          </g>
+          <!-- Pulsing dot right under lead tip -->
+          <circle cx="0" cy="0" r="6" fill="#2563eb" class="animate-ping" opacity="0.65" />
+          <circle cx="0" cy="0" r="4.5" fill="#1e3a8a" />
+        </g>
+      </svg>
+
+      <!-- Student Touch / Mouse Practice Canvas -->
+      <canvas id="practiceCanvas" class="absolute inset-0 w-full h-full pointer-events-none opacity-0 transition-opacity duration-300"></canvas>
+
+      <!-- Practice Mode Info Banner -->
+      <div id="practiceBanner" class="hidden absolute top-2 sm:top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-amber-950 font-black px-3 py-1 sm:px-4 sm:py-1.5 rounded-xl sm:rounded-2xl shadow-lg border-2 border-amber-500 items-center gap-1.5 text-[11px] sm:text-sm whitespace-nowrap z-20">
+        <svg class="w-4 h-4 text-amber-950 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+        </svg>
+        <span>Sen de Çiz: Parmağınla veya kalemle çiz!</span>
+      </div>
+
+    </div>
+
+    <!-- Control Deck & Tools -->
+    <div class="mt-2 sm:mt-3 bg-white rounded-2xl sm:rounded-3xl p-2.5 sm:p-4 border-2 border-indigo-100 shadow-md flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+      
+      <!-- Left Controls: Play / Pause / Replay / Practice -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5 flex-wrap">
+        <!-- Play / Pause -->
+        <button id="playPauseBtn" class="btn-press bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl shadow flex items-center gap-1.5 text-xs sm:text-sm touch-manipulation">
+          <svg id="playIcon" class="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <span id="playBtnLabel">Durdur</span>
+        </button>
+
+        <!-- Replay -->
+        <button id="replayBtn" class="btn-press bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 text-indigo-700 font-extrabold px-2.5 sm:px-3.5 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border border-indigo-200 flex items-center gap-1 text-xs sm:text-sm touch-manipulation" title="Baştan Yaz">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          <span class="hidden sm:inline">Baştan Yaz</span>
+        </button>
+
+        <!-- Student Practice Mode Toggle -->
+        <button id="practiceToggleBtn" class="btn-press bg-amber-400 hover:bg-amber-500 text-amber-950 font-extrabold px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl shadow-sm flex items-center gap-1.5 text-xs sm:text-sm border-2 border-amber-500 touch-manipulation">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          <span id="practiceToggleLabel">Sen de Çiz</span>
+        </button>
+
+        <!-- Canvas Tools (Color Pickers & Clear) -->
+        <div id="practiceDrawingTools" class="hidden items-center gap-1.5 pl-1 border-l-2 border-slate-200">
+          <!-- Ink Colors -->
+          <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button data-pen-color="#dc2626" class="pen-color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-red-600 ring-2 ring-red-400 ring-offset-1"></button>
+            <button data-pen-color="#2563eb" class="pen-color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-600"></button>
+            <button data-pen-color="#16a34a" class="pen-color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-emerald-600"></button>
+            <button data-pen-color="#9333ea" class="pen-color-btn w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-purple-600"></button>
+          </div>
+
+          <!-- Clear Canvas -->
+          <button id="clearCanvasBtn" class="btn-press bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl border border-rose-200 text-xs flex items-center gap-1 touch-manipulation">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            <span>Sil</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Controls: Speed & Guidance Toggles -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5">
+        <!-- Speed Buttons -->
+        <div class="flex items-center bg-slate-100 p-0.5 sm:p-1 rounded-xl sm:rounded-2xl border border-slate-200">
+          <span class="text-xs font-bold text-slate-500 px-1 hidden md:inline">Hız:</span>
+          <button data-speed="0.5" class="speed-toggle-btn px-2 py-1 rounded-lg sm:rounded-xl font-bold text-xs text-slate-600 hover:text-slate-900 touch-manipulation">0.5x</button>
+          <button data-speed="1.0" class="speed-toggle-btn px-2 py-1 rounded-lg sm:rounded-xl font-black text-xs bg-white text-indigo-700 shadow-sm touch-manipulation">1x</button>
+          <button data-speed="1.5" class="speed-toggle-btn px-2 py-1 rounded-lg sm:rounded-xl font-bold text-xs text-slate-600 hover:text-slate-900 touch-manipulation">1.5x</button>
+        </div>
+
+        <!-- Direction Indicators Toggle -->
+        <button id="toggleArrowsBtn" class="btn-press bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm border border-slate-300 flex items-center gap-1 touch-manipulation" title="Yön Okları">
+          <svg class="w-4 h-4 text-slate-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg>
+          <span id="arrowsBtnText" class="hidden sm:inline">Oklar</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Educational Bottom Help Bar (Hidden on Mobile to preserve space) -->
+    <footer class="mt-2 text-center text-slate-500 text-xs hidden sm:flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+      <span class="inline-flex items-center gap-1 font-bold text-slate-700">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        Klavye Kısayolları:
+      </span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-200 rounded font-mono text-slate-800">Boşluk</kbd> Durdur / Başlat</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-200 rounded font-mono text-slate-800">R</kbd> Baştan Yaz</span>
+      <span><kbd class="px-1.5 py-0.5 bg-slate-200 rounded font-mono text-slate-800">← / →</kbd> Önceki / Sonraki Karakter</span>
+    </footer>
+
+  </main>
+
+  <script>
+    /**
+     * CHARACTER DATABASE FOR TURKISH DIK TEMEL HARFLER
+     * Line Coordinates:
+     * Line 1 = 90  (Top Ascender)
+     * Line 2 = 230 (Upper Core)
+     * Line 3 = 390 (Base Core)
+     * Line 4 = 510 (Descender)
+     */
+    const CHARACTERS_DATA = [
+      // ==========================================
+      // KÜÇÜK HARFLER (29 TÜRKÇE HARF)
+      // ==========================================
+      {
+        id: 'a', char: 'a', category: 'kucuk', groupName: '1. Grup (ANETİL)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,268 C 535,244 515,242 498,242 C 452,242 422,274 422,310 C 422,348 452,378 498,378 C 532,378 548,354 548,310 L 548,270', desc: '1. Çemberi saat 2 yönünden sola yuvarla ve kapat', duration: 2000, arrow: { x: 500, y: 242, dx: -20, dy: 0, marker: 'arrowRed' }, num: { x: 550, y: 242, text: '1', color: '#ef4444' } },
+          { d: 'M 548,242 L 548,382', desc: '2. Sağ teğetten aşağıya dik in', duration: 900, arrow: { x: 575, y: 290, dx: 0, dy: 35, marker: 'arrowBlue' }, num: { x: 575, y: 245, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'b', char: 'b', category: 'kucuk', groupName: '3. Grup (ÖRIDSB)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 460,102 L 460,382', desc: '1. 1. çizgiden 3. çizgiye dik in', duration: 1300, arrow: { x: 460, y: 200, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 460, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 460,260 C 480,242 510,242 530,258 C 552,276 552,305 552,320 C 552,355 528,382 485,382 C 475,382 465,380 460,375', desc: '2. Çizgi üzerinden sağa göbeği yuvarla', duration: 1700, arrow: { x: 505, y: 245, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 495, y: 242, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'c', char: 'c', category: 'kucuk', groupName: '4. Grup (ZÇGŞCP)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,268 C 532,244 505,242 485,242 C 445,242 425,274 425,312 C 425,355 450,382 492,382 C 520,382 542,365 548,348', desc: '1. Saat 2 yönünden sola yuvarla, tabanda açık bırak', duration: 1800, arrow: { x: 495, y: 242, dx: -25, dy: 0, marker: 'arrowRed' }, num: { x: 545, y: 242, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'c_cedilla', char: 'ç', category: 'kucuk', groupName: '4. Grup (ZÇGŞCP)', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Alan (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,268 C 532,244 505,242 485,242 C 445,242 425,274 425,312 C 425,355 450,382 492,382 C 520,382 542,365 548,348', desc: '1. c yayını çiz', duration: 1800, arrow: { x: 495, y: 242, dx: -25, dy: 0, marker: 'arrowRed' }, num: { x: 545, y: 242, text: '1', color: '#ef4444' } },
+          { d: 'M 490,395 L 490,440', desc: '2. Altına dik küçük çizgi çek', duration: 600, arrow: { x: 490, y: 410, dx: 0, dy: 20, marker: 'arrowBlue' }, num: { x: 515, y: 415, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'd', char: 'd', category: 'kucuk', groupName: '3. Grup (ÖRIDSB)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 535,268 C 522,244 495,242 478,242 C 438,242 418,274 418,312 C 418,355 442,382 485,382 C 515,382 532,360 538,320 L 538,270', desc: '1. Çemberi yuvarla ve kapat', duration: 1900, arrow: { x: 480, y: 242, dx: -20, dy: 0, marker: 'arrowRed' }, num: { x: 535, y: 242, text: '1', color: '#ef4444' } },
+          { d: 'M 538,102 L 538,382', desc: '2. 1. çizgiden 3. çizgiye sağ teğet dik in', duration: 1300, arrow: { x: 538, y: 200, dx: 0, dy: 40, marker: 'arrowBlue' }, num: { x: 565, y: 102, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'e', char: 'e', category: 'kucuk', groupName: '1. Grup (ANETİL)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,315 L 548,315 C 548,260 520,242 485,242 C 440,242 420,275 420,315 C 420,358 448,382 492,382 C 530,382 546,365 550,352', desc: '1. Ortadan sağa çiz, sola kıvrılıp tamamla', duration: 2300, arrow: { x: 490, y: 315, dx: 30, dy: 0, marker: 'arrowRed' }, num: { x: 425, y: 315, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'f', char: 'f', category: 'kucuk', groupName: '5. Grup (HĞVFJ)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 535,115 C 525,102 495,102 480,118 C 470,132 470,160 470,200 L 470,382', desc: '1. Üstten kavisle başla, dik in', duration: 1700, arrow: { x: 510, y: 102, dx: -20, dy: 0, marker: 'arrowRed' }, num: { x: 535, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 440,230 L 505,230', desc: '2. 2. çizgide yatay köprüyü çiz', duration: 700, arrow: { x: 470, y: 230, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 430, y: 220, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'g', char: 'g', category: 'kucuk', groupName: '4. Grup (ZÇGŞCP)', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Kuyruk Alanı (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,268 C 535,244 515,242 498,242 C 452,242 422,274 422,310 C 422,348 452,378 498,378 C 532,378 548,354 548,310 L 548,270', desc: '1. Orta çemberi tamamla', duration: 1900, arrow: { x: 500, y: 242, dx: -25, dy: 0, marker: 'arrowRed' }, num: { x: 550, y: 242, text: '1', color: '#ef4444' } },
+          { d: 'M 548,242 L 548,460 C 548,495 515,502 480,502 C 455,502 440,490 435,480', desc: '2. 4. çizgiye dik in ve sola kıvır', duration: 1600, arrow: { x: 548, y: 390, dx: 0, dy: 40, marker: 'arrowBlue' }, num: { x: 580, y: 245, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'g_breve', char: 'ğ', category: 'kucuk', groupName: '5. Grup (HĞVFJ)', band: 'ust_orta',
+        bandDesc: 'Tüm Aralıklar (1 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,268 C 535,244 515,242 498,242 C 452,242 422,274 422,310 C 422,348 452,378 498,378 C 532,378 548,354 548,310 L 548,270', desc: '1. Gövde çemberini çiz', duration: 1800, arrow: { x: 500, y: 242, dx: -25, dy: 0, marker: 'arrowRed' }, num: { x: 550, y: 242, text: '1', color: '#ef4444' } },
+          { d: 'M 548,242 L 548,460 C 548,495 515,502 480,502 C 455,502 440,490 435,480', desc: '2. Kuyruğu aşağı indir ve sola kıvır', duration: 1500, arrow: { x: 548, y: 390, dx: 0, dy: 40, marker: 'arrowBlue' }, num: { x: 580, y: 245, text: '2', color: '#2563eb' } },
+          { d: 'M 465,190 C 485,212 510,212 530,190', desc: '3. Üst şapka kavisini çiz', duration: 800, arrow: { x: 495, y: 205, dx: 20, dy: 0, marker: 'arrowEmerald' }, num: { x: 450, y: 185, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'h', char: 'h', category: 'kucuk', groupName: '5. Grup (HĞVFJ)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. 1. çizgiden 3. çizgiye sol dik in', duration: 1300, arrow: { x: 445, y: 200, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 445,280 C 465,242 515,242 535,265 L 535,382', desc: '2. Sağa kemer yapıp dik in', duration: 1500, arrow: { x: 485, y: 242, dx: 25, dy: 10, marker: 'arrowBlue' }, num: { x: 485, y: 232, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'i_dotless', char: 'ı', category: 'kucuk', groupName: '3. Grup (ÖRIDSB)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,242 L 500,382', desc: '1. 2. çizgiden 3. çizgiye dik çizgi in', duration: 1100, arrow: { x: 500, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 500, y: 232, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'i', char: 'i', category: 'kucuk', groupName: '1. Grup (ANETİL)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,242 L 500,382', desc: '1. Gövde dik çizgisini in', duration: 1100, arrow: { x: 500, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 500, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 496,170 C 496,162 504,162 504,170 C 504,178 496,178 496,170 Z', desc: '2. Üstüne noktasını koy', duration: 500, arrow: { x: 500, y: 155, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 500, y: 145, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'j', char: 'j', category: 'kucuk', groupName: '5. Grup (HĞVFJ)', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Kuyruk Alanı (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 515,242 L 515,465 C 515,498 480,502 455,495', desc: '1. 4. çizgiye dik in ve sola kıvır', duration: 1600, arrow: { x: 515, y: 360, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 515, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 511,170 C 511,162 519,162 519,170 C 519,178 511,178 511,170 Z', desc: '2. Üstüne noktasını koy', duration: 500, arrow: { x: 515, y: 155, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 515, y: 145, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'k', char: 'k', category: 'kucuk', groupName: '2. Grup (OMUTÜY)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 450,102 L 450,382', desc: '1. 1. çizgiden 3. çizgiye sol dik in', duration: 1300, arrow: { x: 450, y: 200, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 450, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 535,242 L 452,320', desc: '2. Sağ üstten ortaya eğik in', duration: 900, arrow: { x: 500, y: 275, dx: -25, dy: 20, marker: 'arrowBlue' }, num: { x: 535, y: 232, text: '2', color: '#2563eb' } },
+          { d: 'M 465,308 L 540,382', desc: '3. Ortadan sağ alta eğik in', duration: 900, arrow: { x: 505, y: 345, dx: 25, dy: 25, marker: 'arrowEmerald' }, num: { x: 480, y: 300, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'l', char: 'l', category: 'kucuk', groupName: '1. Grup (ANETİL)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 L 500,362 C 500,378 512,382 530,382', desc: '1. Dik in ve tabanda hafif sağa kıvrıl', duration: 1600, arrow: { x: 500, y: 220, dx: 0, dy: 45, marker: 'arrowRed' }, num: { x: 500, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'm', char: 'm', category: 'kucuk', groupName: '2. Grup (OMUTÜY)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 410,242 L 410,382', desc: '1. Sol dik çizgiyi in', duration: 1000, arrow: { x: 410, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 410, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 410,275 C 425,245 460,242 475,258 L 475,382', desc: '2. Orta bacağı indir', duration: 1300, arrow: { x: 450, y: 245, dx: 20, dy: 10, marker: 'arrowBlue' }, num: { x: 445, y: 235, text: '2', color: '#2563eb' } },
+          { d: 'M 475,275 C 490,245 530,242 545,258 L 545,382', desc: '3. Sağ bacağı tamamla', duration: 1300, arrow: { x: 515, y: 245, dx: 20, dy: 10, marker: 'arrowEmerald' }, num: { x: 515, y: 235, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'n', char: 'n', category: 'kucuk', groupName: '1. Grup (ANETİL)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,242 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1000, arrow: { x: 445, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 445, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 445,280 C 465,242 515,242 535,265 L 535,382', desc: '2. Sağa kemer yapıp dik in', duration: 1500, arrow: { x: 485, y: 242, dx: 25, dy: 10, marker: 'arrowBlue' }, num: { x: 485, y: 232, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'o', char: 'o', category: 'kucuk', groupName: '2. Grup (OMUTÜY)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,242 C 450,242 420,278 420,312 C 420,350 450,382 500,382 C 550,382 580,350 580,312 C 580,278 550,242 500,242 Z', desc: '1. Saat 1 yönünden sola dönerek çemberi kapat', duration: 2200, arrow: { x: 475, y: 242, dx: -25, dy: 5, marker: 'arrowRed' }, num: { x: 510, y: 232, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'o_umlaut', char: 'ö', category: 'kucuk', groupName: '3. Grup (ÖRIDSB)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,242 C 450,242 420,278 420,312 C 420,350 450,382 500,382 C 550,382 580,350 580,312 C 580,278 550,242 500,242 Z', desc: '1. o çemberini tamamla', duration: 2000, arrow: { x: 475, y: 242, dx: -25, dy: 5, marker: 'arrowRed' }, num: { x: 510, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 466,180 C 466,172 474,172 474,180 C 474,188 466,188 466,180 Z', desc: '2. Sol noktasını koy', duration: 500, arrow: { x: 470, y: 165, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 470, y: 155, text: '2', color: '#2563eb' } },
+          { d: 'M 526,180 C 526,172 534,172 534,180 C 534,188 526,188 526,180 Z', desc: '3. Sağ noktasını koy', duration: 500, arrow: { x: 530, y: 165, dx: 0, dy: 10, marker: 'arrowEmerald' }, num: { x: 530, y: 155, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'p', char: 'p', category: 'kucuk', groupName: '4. Grup (ZÇGŞCP)', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Kuyruk Alanı (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 450,242 L 450,502', desc: '1. 2. çizgiden 4. çizgiye sol dik in', duration: 1500, arrow: { x: 450, y: 350, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 450, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 450,260 C 475,242 510,242 532,258 C 550,274 550,300 550,315 C 550,345 528,375 485,375 C 472,375 460,372 450,368', desc: '2. Sağa üst göbeği yuvarla ve kapat', duration: 1700, arrow: { x: 505, y: 245, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 495, y: 242, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'r', char: 'r', category: 'kucuk', groupName: '3. Grup (ÖRIDSB)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 460,242 L 460,382', desc: '1. Sol dik çizgiyi in', duration: 1000, arrow: { x: 460, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 460, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 460,285 C 475,250 510,242 535,248', desc: '2. Çizgiden yukarı çıkıp sağa kol aç', duration: 1100, arrow: { x: 495, y: 245, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 490, y: 235, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 's', char: 's', category: 'kucuk', groupName: '3. Grup (ÖRIDSB)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 535,265 C 522,244 495,242 475,250 C 445,262 445,290 475,305 L 515,318 C 545,330 550,355 528,375 C 505,385 470,385 445,365', desc: '1. Üstten sola kavis al, ortaya dön, tabanda sağa kıvrıl', duration: 2300, arrow: { x: 495, y: 244, dx: -25, dy: 5, marker: 'arrowRed' }, num: { x: 535, y: 242, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 's_cedilla', char: 'ş', category: 'kucuk', groupName: '4. Grup (ZÇGŞCP)', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Alan (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 535,265 C 522,244 495,242 475,250 C 445,262 445,290 475,305 L 515,318 C 545,330 550,355 528,375 C 505,385 470,385 445,365', desc: '1. s gövdesini çiz', duration: 2200, arrow: { x: 495, y: 244, dx: -25, dy: 5, marker: 'arrowRed' }, num: { x: 535, y: 242, text: '1', color: '#ef4444' } },
+          { d: 'M 490,395 L 490,440', desc: '2. Altına noktasını/çengelini koy', duration: 600, arrow: { x: 490, y: 410, dx: 0, dy: 20, marker: 'arrowBlue' }, num: { x: 515, y: 415, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 't', char: 't', category: 'kucuk', groupName: '1. Grup (ANETİL)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 490,130 L 490,362 C 490,380 505,382 525,382', desc: '1. Dik inip tabanda sağa kıvrıl', duration: 1500, arrow: { x: 490, y: 230, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 490, y: 120, text: '1', color: '#ef4444' } },
+          { d: 'M 455,230 L 530,230', desc: '2. 2. çizgide yatay köprüyü çiz', duration: 700, arrow: { x: 490, y: 230, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 440, y: 220, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'u', char: 'u', category: 'kucuk', groupName: '2. Grup (OMUTÜY)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,242 L 445,355 C 445,380 475,382 510,382 L 535,382', desc: '1. Dik in, tabanda yuvarlanıp sağa çık', duration: 1600, arrow: { x: 445, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 445, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 535,242 L 535,382', desc: '2. Sağ teğetten aşağı dik in', duration: 900, arrow: { x: 535, y: 290, dx: 0, dy: 35, marker: 'arrowBlue' }, num: { x: 555, y: 235, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'u_umlaut', char: 'ü', category: 'kucuk', groupName: '2. Grup (OMUTÜY)', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,242 L 445,355 C 445,380 475,382 510,382 L 535,382', desc: '1. u gövdesini çiz', duration: 1500, arrow: { x: 445, y: 290, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 445, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 535,242 L 535,382', desc: '2. Sağ dik çizgiyi in', duration: 900, arrow: { x: 535, y: 290, dx: 0, dy: 35, marker: 'arrowBlue' }, num: { x: 555, y: 235, text: '2', color: '#2563eb' } },
+          { d: 'M 466,180 C 466,172 474,172 474,180 C 474,188 466,188 466,180 Z', desc: '3. Sol nokta', duration: 450, arrow: { x: 470, y: 165, dx: 0, dy: 10, marker: 'arrowEmerald' }, num: { x: 470, y: 155, text: '3', color: '#059669' } },
+          { d: 'M 516,180 C 516,172 524,172 524,180 C 524,188 516,188 516,180 Z', desc: '4. Sağ nokta', duration: 450, arrow: { x: 520, y: 165, dx: 0, dy: 10, marker: 'arrowEmerald' }, num: { x: 520, y: 155, text: '4', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'v', char: 'v', category: 'kucuk', groupName: '5. Grup (HĞVFJ)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,242 L 495,382', desc: '1. Sol üstten tabana eğik in', duration: 1100, arrow: { x: 470, y: 310, dx: 20, dy: 35, marker: 'arrowRed' }, num: { x: 435, y: 235, text: '1', color: '#ef4444' } },
+          { d: 'M 495,382 L 545,242', desc: '2. Tabandan sağ üste eğik çık', duration: 1100, arrow: { x: 520, y: 310, dx: 20, dy: -35, marker: 'arrowBlue' }, num: { x: 555, y: 235, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'y', char: 'y', category: 'kucuk', groupName: '2. Grup (OMUTÜY)', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Kuyruk Alanı (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,242 L 490,325', desc: '1. Sol eğik kolu çiz', duration: 900, arrow: { x: 465, y: 280, dx: 20, dy: 25, marker: 'arrowRed' }, num: { x: 430, y: 232, text: '1', color: '#ef4444' } },
+          { d: 'M 545,242 L 470,470 C 460,498 440,502 425,495', desc: '2. Sağ üstten eğik in ve sola kuyruk kıvır', duration: 1700, arrow: { x: 510, y: 340, dx: -25, dy: 45, marker: 'arrowBlue' }, num: { x: 555, y: 235, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'z', char: 'z', category: 'kucuk', groupName: '4. Grup (ZÇGŞCP)', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,242 L 545,242 L 445,382 L 545,382', desc: '1. Sağa git, sola çapraz in, tabanda sağa git', duration: 2400, arrow: { x: 495, y: 242, dx: 30, dy: 0, marker: 'arrowRed' }, num: { x: 430, y: 235, text: '1', color: '#ef4444' } }
+        ]
+      },
+
+      // ==========================================
+      // BÜYÜK HARFLER (29 TÜRKÇE HARF, ÜST VE ORTA ALAN)
+      // ==========================================
+      {
+        id: 'A', char: 'A', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 L 430,382', desc: '1. Tepeden sola eğik in', duration: 1300, arrow: { x: 470, y: 220, dx: -20, dy: 35, marker: 'arrowRed' }, num: { x: 490, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 500,102 L 570,382', desc: '2. Tepeden sağa eğik in', duration: 1300, arrow: { x: 530, y: 220, dx: 20, dy: 35, marker: 'arrowBlue' }, num: { x: 520, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 452,280 L 548,280', desc: '3. Orta köprüyü çiz', duration: 800, arrow: { x: 490, y: 280, dx: 30, dy: 0, marker: 'arrowEmerald' }, num: { x: 435, y: 280, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'B', char: 'B', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,102 L 440,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 440, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 440, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 440,102 C 500,102 540,120 540,170 C 540,215 500,230 440,230', desc: '2. Üst yuvarlağı çiz', duration: 1500, arrow: { x: 500, y: 110, dx: 25, dy: 10, marker: 'arrowBlue' }, num: { x: 490, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 440,230 C 510,230 550,250 550,305 C 550,365 500,382 440,382', desc: '3. Alt yuvarlağı çiz', duration: 1600, arrow: { x: 500, y: 240, dx: 25, dy: 10, marker: 'arrowEmerald' }, num: { x: 490, y: 232, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'C', char: 'C', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 550,150 C 520,102 470,102 445,140 C 415,190 415,290 445,340 C 470,382 520,382 550,340', desc: '1. Sağ üstten sola yuvarlanarak açık hilal çiz', duration: 2400, arrow: { x: 495, y: 105, dx: -30, dy: 0, marker: 'arrowRed' }, num: { x: 555, y: 135, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'C_cedilla', char: 'Ç', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Tüm Aralıklar (1 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 550,150 C 520,102 470,102 445,140 C 415,190 415,290 445,340 C 470,382 520,382 550,340', desc: '1. Büyük C yayını çiz', duration: 2300, arrow: { x: 495, y: 105, dx: -30, dy: 0, marker: 'arrowRed' }, num: { x: 555, y: 135, text: '1', color: '#ef4444' } },
+          { d: 'M 490,395 L 490,450', desc: '2. Altına dik küçük çizgi çek', duration: 600, arrow: { x: 490, y: 415, dx: 0, dy: 20, marker: 'arrowBlue' }, num: { x: 515, y: 415, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'D', char: 'D', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,102 L 440,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 440, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 440, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 440,102 C 530,102 565,150 565,242 C 565,335 530,382 440,382', desc: '2. Sağa büyük göbeği çizip kapat', duration: 2200, arrow: { x: 505, y: 105, dx: 30, dy: 5, marker: 'arrowBlue' }, num: { x: 485, y: 92, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'E', char: 'E', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 445, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 445,102 L 545,102', desc: '2. Üst yatay çizgiyi çek', duration: 800, arrow: { x: 495, y: 102, dx: 30, dy: 0, marker: 'arrowBlue' }, num: { x: 480, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 445,230 L 530,230', desc: '3. Orta yatay çizgiyi çek', duration: 700, arrow: { x: 485, y: 230, dx: 25, dy: 0, marker: 'arrowEmerald' }, num: { x: 475, y: 222, text: '3', color: '#059669' } },
+          { d: 'M 445,382 L 545,382', desc: '4. Taban yatay çizgisini çek', duration: 800, arrow: { x: 495, y: 382, dx: 30, dy: 0, marker: 'arrowBlue' }, num: { x: 480, y: 372, text: '4', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'F', char: 'F', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 445, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 445,102 L 545,102', desc: '2. Üst yatay çizgiyi çek', duration: 800, arrow: { x: 495, y: 102, dx: 30, dy: 0, marker: 'arrowBlue' }, num: { x: 480, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 445,230 L 525,230', desc: '3. Orta yatay çizgiyi çek', duration: 700, arrow: { x: 485, y: 230, dx: 25, dy: 0, marker: 'arrowEmerald' }, num: { x: 475, y: 222, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'G', char: 'G', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 550,150 C 520,102 470,102 445,140 C 415,190 415,290 445,340 C 470,382 520,382 550,340 L 550,260 L 505,260', desc: '1. Hilal kavisini çiz, tabandan 2. çizgiye çıkıp içeri gir', duration: 2800, arrow: { x: 495, y: 105, dx: -30, dy: 0, marker: 'arrowRed' }, num: { x: 555, y: 135, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'G_breve', char: 'Ğ', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 550,150 C 520,102 470,102 445,140 C 415,190 415,290 445,340 C 470,382 520,382 550,340 L 550,260 L 505,260', desc: '1. G gövdesini çiz', duration: 2800, arrow: { x: 495, y: 105, dx: -30, dy: 0, marker: 'arrowRed' }, num: { x: 555, y: 135, text: '1', color: '#ef4444' } },
+          { d: 'M 470,75 C 490,95 515,95 535,75', desc: '2. Üst şapka kavisini çiz', duration: 800, arrow: { x: 500, y: 88, dx: 20, dy: 0, marker: 'arrowBlue' }, num: { x: 450, y: 70, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'H', char: 'H', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,102 L 440,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 440, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 440, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 545,102 L 545,382', desc: '2. Sağ dik çizgiyi in', duration: 1300, arrow: { x: 545, y: 220, dx: 0, dy: 40, marker: 'arrowBlue' }, num: { x: 545, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 440,230 L 545,230', desc: '3. 2. çizgide orta köprüyü çiz', duration: 800, arrow: { x: 490, y: 230, dx: 30, dy: 0, marker: 'arrowEmerald' }, num: { x: 430, y: 220, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'I_dotless', char: 'I', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 L 500,382', desc: '1. 1. çizgiden 3. çizgiye tek dik in', duration: 1300, arrow: { x: 500, y: 220, dx: 0, dy: 45, marker: 'arrowRed' }, num: { x: 500, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'I_dotted', char: 'İ', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 L 500,382', desc: '1. Dik çizgiyi in', duration: 1300, arrow: { x: 500, y: 220, dx: 0, dy: 45, marker: 'arrowRed' }, num: { x: 500, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 496,55 C 496,47 504,47 504,55 C 504,63 496,63 496,55 Z', desc: '2. Üstüne noktasını koy', duration: 500, arrow: { x: 500, y: 40, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 500, y: 35, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'J', char: 'J', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 525,102 L 525,340 C 525,375 495,382 465,372 C 450,365 440,350 440,335', desc: '1. 1. çizgiden dik in, tabanda sola kanca kıvır', duration: 1800, arrow: { x: 525, y: 220, dx: 0, dy: 45, marker: 'arrowRed' }, num: { x: 525, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'K', char: 'K', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 445, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 545,102 L 447,235', desc: '2. Sağ üstten ortaya eğik in', duration: 1000, arrow: { x: 500, y: 165, dx: -30, dy: 30, marker: 'arrowBlue' }, num: { x: 545, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 465,225 L 550,382', desc: '3. Ortadan sağ alta eğik in', duration: 1000, arrow: { x: 510, y: 300, dx: 30, dy: 35, marker: 'arrowEmerald' }, num: { x: 485, y: 215, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'L', char: 'L', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 455,102 L 455,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 455, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 455, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 455,382 L 545,382', desc: '2. Taban çizgisinde sağa git', duration: 800, arrow: { x: 500, y: 382, dx: 30, dy: 0, marker: 'arrowBlue' }, num: { x: 485, y: 372, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'M', char: 'M', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 425,102 L 425,382', desc: '1. Sol dik çizgiyi in', duration: 1100, arrow: { x: 425, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 425, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 425,102 L 495,360', desc: '2. Tepeden taban ortasına eğik in', duration: 1100, arrow: { x: 460, y: 230, dx: 25, dy: 45, marker: 'arrowBlue' }, num: { x: 445, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 495,360 L 565,102', desc: '3. Ortadan sağ tepeye eğik çık', duration: 1100, arrow: { x: 530, y: 230, dx: 25, dy: -45, marker: 'arrowEmerald' }, num: { x: 495, y: 375, text: '3', color: '#059669' } },
+          { d: 'M 565,102 L 565,382', desc: '4. Sağ dik çizgiyi in', duration: 1100, arrow: { x: 565, y: 220, dx: 0, dy: 40, marker: 'arrowBlue' }, num: { x: 565, y: 92, text: '4', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'N', char: 'N', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1200, arrow: { x: 445, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 445,102 L 545,382', desc: '2. Sol tepeden sağ tabana çapraz in', duration: 1400, arrow: { x: 495, y: 242, dx: 30, dy: 45, marker: 'arrowBlue' }, num: { x: 465, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 545,102 L 545,382', desc: '3. Sağ dik çizgiyi in', duration: 1200, arrow: { x: 545, y: 220, dx: 0, dy: 40, marker: 'arrowEmerald' }, num: { x: 545, y: 92, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'O', char: 'O', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 C 430,102 390,165 390,242 C 390,320 430,382 500,382 C 570,382 610,320 610,242 C 610,165 570,102 500,102 Z', desc: '1. Tepeden sola büyük tam oval yuvarla', duration: 2500, arrow: { x: 465, y: 104, dx: -35, dy: 5, marker: 'arrowRed' }, num: { x: 510, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'O_umlaut', char: 'Ö', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 C 430,102 390,165 390,242 C 390,320 430,382 500,382 C 570,382 610,320 610,242 C 610,165 570,102 500,102 Z', desc: '1. O gövdesini çiz', duration: 2400, arrow: { x: 465, y: 104, dx: -35, dy: 5, marker: 'arrowRed' }, num: { x: 510, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 466,55 C 466,47 474,47 474,55 C 474,63 466,63 466,55 Z', desc: '2. Sol nokta', duration: 450, arrow: { x: 470, y: 40, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 470, y: 35, text: '2', color: '#2563eb' } },
+          { d: 'M 526,55 C 526,47 534,47 534,55 C 534,63 526,63 526,55 Z', desc: '3. Sağ nokta', duration: 450, arrow: { x: 530, y: 40, dx: 0, dy: 10, marker: 'arrowEmerald' }, num: { x: 530, y: 35, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'P', char: 'P', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 445, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 445,102 C 510,102 550,120 550,170 C 550,220 510,235 445,235', desc: '2. Üst yuvarlağı çizip 2. çizgide kapat', duration: 1700, arrow: { x: 505, y: 105, dx: 25, dy: 5, marker: 'arrowBlue' }, num: { x: 485, y: 92, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'R', char: 'R', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,102 L 445,382', desc: '1. Sol dik çizgiyi in', duration: 1300, arrow: { x: 445, y: 220, dx: 0, dy: 40, marker: 'arrowRed' }, num: { x: 445, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 445,102 C 510,102 550,120 550,170 C 550,220 510,235 445,235', desc: '2. Üst yuvarlağı kapat', duration: 1600, arrow: { x: 505, y: 105, dx: 25, dy: 5, marker: 'arrowBlue' }, num: { x: 485, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 480,235 L 550,382', desc: '3. 2. çizgiden sağ tabana eğik bacak in', duration: 1100, arrow: { x: 515, y: 310, dx: 25, dy: 35, marker: 'arrowEmerald' }, num: { x: 495, y: 225, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'S', char: 'S', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,150 C 525,105 480,102 455,125 C 425,150 425,195 465,225 L 525,255 C 565,280 565,330 535,365 C 505,385 455,385 435,348', desc: '1. Sağa kavisle başla, ortaya kıvrıl, tabanda sola dön', duration: 2600, arrow: { x: 495, y: 104, dx: -30, dy: 5, marker: 'arrowRed' }, num: { x: 545, y: 135, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'S_cedilla', char: 'Ş', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Tüm Aralıklar (1 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,150 C 525,105 480,102 455,125 C 425,150 425,195 465,225 L 525,255 C 565,280 565,330 535,365 C 505,385 455,385 435,348', desc: '1. S gövdesini çiz', duration: 2500, arrow: { x: 495, y: 104, dx: -30, dy: 5, marker: 'arrowRed' }, num: { x: 545, y: 135, text: '1', color: '#ef4444' } },
+          { d: 'M 490,395 L 490,450', desc: '2. Altına noktasını koy', duration: 600, arrow: { x: 490, y: 415, dx: 0, dy: 20, marker: 'arrowBlue' }, num: { x: 515, y: 415, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'T', char: 'T', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 430,102 L 570,102', desc: '1. 1. çizgide üst yatay çatıyı çek', duration: 900, arrow: { x: 500, y: 102, dx: 35, dy: 0, marker: 'arrowRed' }, num: { x: 420, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 500,102 L 500,382', desc: '2. Ortadan tabana dik in', duration: 1300, arrow: { x: 500, y: 220, dx: 0, dy: 45, marker: 'arrowBlue' }, num: { x: 520, y: 110, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'U', char: 'U', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,102 L 440,320 C 440,378 475,382 500,382 C 525,382 560,378 560,320 L 560,102', desc: '1. Soldan in, tabanda kavis alıp sağ üste çık', duration: 2500, arrow: { x: 440, y: 200, dx: 0, dy: 45, marker: 'arrowRed' }, num: { x: 440, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'U_umlaut', char: 'Ü', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,102 L 440,320 C 440,378 475,382 500,382 C 525,382 560,378 560,320 L 560,102', desc: '1. U çanağını çiz', duration: 2400, arrow: { x: 440, y: 200, dx: 0, dy: 45, marker: 'arrowRed' }, num: { x: 440, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 466,55 C 466,47 474,47 474,55 C 474,63 466,63 466,55 Z', desc: '2. Sol nokta', duration: 450, arrow: { x: 470, y: 40, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 470, y: 35, text: '2', color: '#2563eb' } },
+          { d: 'M 526,55 C 526,47 534,47 534,55 C 534,63 526,63 526,55 Z', desc: '3. Sağ nokta', duration: 450, arrow: { x: 530, y: 40, dx: 0, dy: 10, marker: 'arrowEmerald' }, num: { x: 530, y: 35, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'V', char: 'V', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 435,102 L 500,382', desc: '1. Sol tepeden taban ortasına eğik in', duration: 1300, arrow: { x: 470, y: 220, dx: 25, dy: 45, marker: 'arrowRed' }, num: { x: 425, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 500,382 L 565,102', desc: '2. Tabandan sağ tepeye eğik çık', duration: 1300, arrow: { x: 530, y: 220, dx: 25, dy: -45, marker: 'arrowBlue' }, num: { x: 575, y: 92, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'Y', char: 'Y', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 435,102 L 500,230', desc: '1. Sol eğik kolu ortaya in', duration: 1000, arrow: { x: 465, y: 165, dx: 25, dy: 30, marker: 'arrowRed' }, num: { x: 425, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 565,102 L 500,230', desc: '2. Sağ eğik kolu ortaya in', duration: 1000, arrow: { x: 535, y: 165, dx: -25, dy: 30, marker: 'arrowBlue' }, num: { x: 575, y: 92, text: '2', color: '#2563eb' } },
+          { d: 'M 500,230 L 500,382', desc: '3. Ortadan tabana dik in', duration: 1000, arrow: { x: 500, y: 300, dx: 0, dy: 40, marker: 'arrowEmerald' }, num: { x: 520, y: 240, text: '3', color: '#059669' } }
+        ]
+      },
+      {
+        id: 'Z', char: 'Z', category: 'buyuk', groupName: 'Büyük Harf', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 435,102 L 565,102 L 435,382 L 565,382', desc: '1. Sağa git, sola çapraz in, tabanda sağa git', duration: 2600, arrow: { x: 500, y: 102, dx: 40, dy: 0, marker: 'arrowRed' }, num: { x: 420, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+
+      // ==========================================
+      // RAKAMLAR (0-9 ARASI, ÜST VE ORTA ALAN)
+      // ==========================================
+      {
+        id: '0', char: '0', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 C 450,102 420,165 420,242 C 420,320 450,382 500,382 C 550,382 580,320 580,242 C 580,165 550,102 500,102 Z', desc: '1. Tepeden sola doğru tam oval yuvarla', duration: 2300, arrow: { x: 465, y: 105, dx: -30, dy: 5, marker: 'arrowRed' }, num: { x: 510, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: '1', char: '1', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 460,165 L 505,102', desc: '1. Burun kısmını eğik çık', duration: 800, arrow: { x: 480, y: 135, dx: 18, dy: -20, marker: 'arrowRed' }, num: { x: 448, y: 175, text: '1', color: '#ef4444' } },
+          { d: 'M 505,102 L 505,382', desc: '2. Tepeden tabana dik in', duration: 1500, arrow: { x: 505, y: 230, dx: 0, dy: 45, marker: 'arrowBlue' }, num: { x: 520, y: 102, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: '2', char: '2', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 445,150 C 445,105 490,102 518,102 C 555,102 565,130 560,165 C 550,215 470,300 440,382 L 565,382', desc: '1. Yay çizerek başla, eğik in ve tabanda sağa git', duration: 2700, arrow: { x: 495, y: 102, dx: 25, dy: 5, marker: 'arrowRed' }, num: { x: 435, y: 145, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: '3', char: '3', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 448,125 C 465,102 510,102 538,105 C 565,120 565,160 540,185 C 520,205 490,215 470,225', desc: '1. Üst kavisi ortaya kadar çiz', duration: 1500, arrow: { x: 500, y: 105, dx: 25, dy: 5, marker: 'arrowRed' }, num: { x: 435, y: 125, text: '1', color: '#ef4444' } },
+          { d: 'M 470,225 C 500,230 540,240 555,275 C 568,315 550,365 515,382 C 475,382 450,365 440,345', desc: '2. Alt kavisi tabana yuvarla', duration: 1600, arrow: { x: 520, y: 245, dx: 25, dy: 15, marker: 'arrowBlue' }, num: { x: 485, y: 225, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: '4', char: '4', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 525,102 L 440,270 L 555,270', desc: '1. Eğik in ve 2. çizgide sağa git', duration: 1800, arrow: { x: 480, y: 180, dx: -25, dy: 35, marker: 'arrowRed' }, num: { x: 525, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 525,180 L 525,382', desc: '2. Dik çizgiyi yukarıdan tabana in', duration: 1200, arrow: { x: 525, y: 280, dx: 0, dy: 40, marker: 'arrowBlue' }, num: { x: 545, y: 180, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: '5', char: '5', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 470,102 L 460,225 C 475,215 510,215 538,230 C 565,255 565,305 540,345 C 510,382 460,382 435,355', desc: '1. Dik in ve alt göbeği yuvarla', duration: 2300, arrow: { x: 465, y: 160, dx: -5, dy: 35, marker: 'arrowRed' }, num: { x: 470, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 465,102 L 545,102', desc: '2. Üst yatay şapkayı çek', duration: 700, arrow: { x: 505, y: 102, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 490, y: 92, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: '6', char: '6', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 535,130 C 515,102 465,120 440,200 C 420,265 425,335 455,368 C 485,385 535,385 550,345 C 565,305 545,260 495,260 C 455,260 435,290 435,320', desc: '1. Tepeden sola kavisle in, tabandan göbeği yuvarlayıp kapat', duration: 2700, arrow: { x: 500, y: 105, dx: -30, dy: 15, marker: 'arrowRed' }, num: { x: 540, y: 120, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: '7', char: '7', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 440,102 L 550,102 L 470,382', desc: '1. Sağa git ve sola eğik tabana in', duration: 2000, arrow: { x: 495, y: 102, dx: 35, dy: 0, marker: 'arrowRed' }, num: { x: 425, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 470,230 L 530,230', desc: '2. 2. çizgide orta yatay kemeri çek', duration: 700, arrow: { x: 500, y: 230, dx: 25, dy: 0, marker: 'arrowBlue' }, num: { x: 455, y: 220, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: '8', char: '8', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 C 465,102 445,130 455,165 C 465,200 490,215 515,235 C 545,255 565,290 550,335 C 535,382 465,382 445,340 C 435,300 460,260 485,235 C 510,210 535,195 540,165 C 545,130 525,102 500,102 Z', desc: '1. S şeklinde in ve çapraz dönerek yukarıda kapat', duration: 3000, arrow: { x: 475, y: 104, dx: -25, dy: 10, marker: 'arrowRed' }, num: { x: 505, y: 92, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: '9', char: '9', category: 'rakam', groupName: 'Rakam', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 545,180 C 545,130 515,102 475,102 C 435,102 415,140 420,185 C 425,230 465,250 505,250 C 535,250 545,225 545,180 L 545,340 C 545,375 515,382 485,380', desc: '1. Üst çemberi kapat, sağ teğetten tabana in ve sola kıvır', duration: 2800, arrow: { x: 470, y: 102, dx: -25, dy: 0, marker: 'arrowRed' }, num: { x: 545, y: 102, text: '1', color: '#ef4444' } }
+        ]
+      },
+
+      // ==========================================
+      // NOKTALAMA İŞARETLERİ
+      // ==========================================
+      {
+        id: 'nokta', char: '.', category: 'noktalama', groupName: 'Noktalama', band: 'nokta',
+        bandDesc: 'Taban Çizgisi Üzerinde (3. Çizgi)',
+        steps: [
+          { d: 'M 500,375 L 500,376', desc: '1. 3. çizgi üzerine nokta koy', duration: 500, arrow: { x: 500, y: 350, dx: 0, dy: 15, marker: 'arrowRed' }, num: { x: 500, y: 340, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'virgul', char: ',', category: 'noktalama', groupName: 'Noktalama', band: 'orta_alt',
+        bandDesc: 'Taban ve Alt Aralık (3 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 502,370 C 510,373 512,384 508,396 C 502,414 490,430 474,442', desc: '1. 3. çizgide noktadan başla, aşağı sola doğru zarifçe kıvır', duration: 900, arrow: { x: 508, y: 388, dx: -22, dy: 34, marker: 'arrowRed' }, num: { x: 528, y: 366, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'soru', char: '?', category: 'noktalama', groupName: 'Noktalama', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 450,140 C 450,102 510,102 540,105 C 565,125 560,165 530,195 C 505,225 505,260 505,295', desc: '1. Yay çizerek başla, ortaya in ve dik dur', duration: 2200, arrow: { x: 500, y: 105, dx: 25, dy: 0, marker: 'arrowRed' }, num: { x: 435, y: 135, text: '1', color: '#ef4444' } },
+          { d: 'M 500,375 L 500,376', desc: '2. Taban çizgisine noktasını koy', duration: 500, arrow: { x: 500, y: 350, dx: 0, dy: 15, marker: 'arrowBlue' }, num: { x: 500, y: 340, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'unlem', char: '!', category: 'noktalama', groupName: 'Noktalama', band: 'ust_orta',
+        bandDesc: 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,102 L 500,295', desc: '1. 1. çizgiden orta çizginin altına dik in', duration: 1400, arrow: { x: 500, y: 180, dx: 0, dy: 35, marker: 'arrowRed' }, num: { x: 500, y: 92, text: '1', color: '#ef4444' } },
+          { d: 'M 500,375 L 500,376', desc: '2. Noktasını koy', duration: 500, arrow: { x: 500, y: 350, dx: 0, dy: 15, marker: 'arrowBlue' }, num: { x: 500, y: 340, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'iki_nokta', char: ':', category: 'noktalama', groupName: 'Noktalama', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,280 L 500,281', desc: '1. Üst nokta', duration: 500, arrow: { x: 500, y: 260, dx: 0, dy: 10, marker: 'arrowRed' }, num: { x: 500, y: 250, text: '1', color: '#ef4444' } },
+          { d: 'M 500,375 L 500,376', desc: '2. Alt nokta', duration: 500, arrow: { x: 500, y: 350, dx: 0, dy: 10, marker: 'arrowBlue' }, num: { x: 500, y: 340, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'noktali_virgul', char: ';', category: 'noktalama', groupName: 'Noktalama', band: 'orta_alt',
+        bandDesc: 'Orta ve Alt Aralık (2 - 4. Çizgiler Arası)',
+        steps: [
+          { d: 'M 500,280 L 500,281', desc: '1. Üst nokta', duration: 500, arrow: { x: 500, y: 260, dx: 0, dy: 10, marker: 'arrowRed' }, num: { x: 500, y: 250, text: '1', color: '#ef4444' } },
+          { d: 'M 502,370 C 510,373 512,384 508,396 C 502,414 490,430 474,442', desc: '2. Alt virgül', duration: 900, arrow: { x: 508, y: 388, dx: -22, dy: 34, marker: 'arrowBlue' }, num: { x: 528, y: 366, text: '2', color: '#2563eb' } }
+        ]
+      },
+      {
+        id: 'kisa_cizgi', char: '-', category: 'noktalama', groupName: 'Noktalama', band: 'orta',
+        bandDesc: 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)',
+        steps: [
+          { d: 'M 460,310 L 540,310', desc: '1. Ortada yatay kısa çizgi çek', duration: 800, arrow: { x: 495, y: 310, dx: 25, dy: 0, marker: 'arrowRed' }, num: { x: 450, y: 300, text: '1', color: '#ef4444' } }
+        ]
+      },
+      {
+        id: 'kesme', char: "'", category: 'noktalama', groupName: 'Noktalama', band: 'ust_orta',
+        bandDesc: 'Üst Aralık (1 - 2. Çizgiler Arası)',
+        steps: [
+          { d: 'M 502,135 C 510,138 512,149 508,161 C 502,178 490,194 474,205', desc: '1. 1. ve 2. çizgiler arasında yukarıdan aşağı sola kavisle çiz', duration: 900, arrow: { x: 508, y: 150, dx: -22, dy: 34, marker: 'arrowRed' }, num: { x: 528, y: 130, text: '1', color: '#ef4444' } }
+        ]
+      }
+    ];
+
+    // Global application state
+    let activeCategory = 'kucuk';
+    let currentCharacterIndex = 0;
+    let filteredCharacters = [];
+    let isPlaying = true;
+    let speedFactor = 1.0;
+    let showGuidanceArrows = true;
+    let isSoundMuted = false;
+
+    // Web Audio Synthesizer
+    let audioContext = null;
+
+    function initAudio() {
+      if (!audioContext) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtx();
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    }
+
+    function playTone(freq, type = 'sine', duration = 0.25, volume = 0.15) {
+      if (isSoundMuted) return;
+      try {
+        initAudio();
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioContext.currentTime);
+
+        gain.gain.setValueAtTime(volume, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioContext.destination);
+
+        osc.start();
+        osc.stop(audioContext.currentTime + duration);
+      } catch (err) {
+        console.warn("Audio play error", err);
+      }
+    }
+
+    // Sound effects for strokes
+    function playStepStartSound() {
+      playTone(440, 'triangle', 0.15, 0.1);
+    }
+    function playStepEndSound() {
+      playTone(587.33, 'sine', 0.2, 0.14);
+    }
+    function playCharacterCompleteSound() {
+      // Major triad success flourish
+      playTone(523.25, 'triangle', 0.2, 0.12);
+      setTimeout(() => playTone(659.25, 'triangle', 0.25, 0.14), 100);
+      setTimeout(() => playTone(783.99, 'sine', 0.45, 0.18), 220);
+    }
+
+    // DOM Elements
+    const activeCharAvatar = document.getElementById('activeCharAvatar');
+    const zoneDescription = document.getElementById('zoneDescription');
+    const characterRibbon = document.getElementById('characterRibbon');
+    const catTabs = document.querySelectorAll('.cat-tab');
+    const prevCharBtn = document.getElementById('prevCharBtn');
+    const nextCharBtn = document.getElementById('nextCharBtn');
+    const ghostGroup = document.getElementById('ghostGroup');
+    const inkGroup = document.getElementById('inkGroup');
+    const guidesGroup = document.getElementById('guidesGroup');
+    const pencilTracer = document.getElementById('pencilTracer');
+    const bandUpper = document.getElementById('bandUpper');
+    const bandMiddle = document.getElementById('bandMiddle');
+    const bandLower = document.getElementById('bandLower');
+
+    // Controls
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playBtnLabel = document.getElementById('playBtnLabel');
+    const playIcon = document.getElementById('playIcon');
+    const replayBtn = document.getElementById('replayBtn');
+    const toggleArrowsBtn = document.getElementById('toggleArrowsBtn');
+    const arrowsBtnText = document.getElementById('arrowsBtnText');
+    const speedButtons = document.querySelectorAll('.speed-toggle-btn');
+    const audioToggleBtn = document.getElementById('audioToggleBtn');
+    const soundLabel = document.getElementById('soundLabel');
+    const soundIcon = document.getElementById('soundIcon');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    // Student Canvas Elements
+    const practiceToggleBtn = document.getElementById('practiceToggleBtn');
+    const practiceToggleLabel = document.getElementById('practiceToggleLabel');
+    const practiceDrawingTools = document.getElementById('practiceDrawingTools');
+    const practiceCanvas = document.getElementById('practiceCanvas');
+    const practiceBanner = document.getElementById('practiceBanner');
+    const clearCanvasBtn = document.getElementById('clearCanvasBtn');
+    const penColorButtons = document.querySelectorAll('.pen-color-btn');
+
+    // Animation Engine Variables
+    let currentStepIndex = 0;
+    let stepProgress = 0;
+    let animState = 'idle'; // 'drawing' | 'pauseStep' | 'finished'
+    let stateTimer = 0;
+    let lastTime = 0;
+    let activePathElement = null;
+    let stepPathsList = [];
+
+    const PAUSE_BETWEEN_STEPS = 450; // ms
+    const PAUSE_BEFORE_LOOP = 2000;  // ms
+
+    function getActiveCharacter() {
+      return filteredCharacters[currentCharacterIndex] || CHARACTERS_DATA[0];
+    }
+
+    // Refresh Category Tabs and Character Ribbon
+    function setCategory(catKey) {
+      activeCategory = catKey;
+      catTabs.forEach(tab => {
+        if (tab.dataset.cat === catKey) {
+          tab.className = "cat-tab flex-1 sm:flex-initial px-2.5 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-extrabold text-xs sm:text-sm bg-white text-indigo-700 shadow-sm transition-all text-center whitespace-nowrap";
+        } else {
+          tab.className = "cat-tab flex-1 sm:flex-initial px-2.5 sm:px-4 py-1.5 rounded-lg sm:rounded-xl font-bold text-xs sm:text-sm text-slate-600 hover:text-slate-900 transition-all text-center whitespace-nowrap";
+        }
+      });
+
+      filteredCharacters = CHARACTERS_DATA.filter(c => c.category === catKey);
+      currentCharacterIndex = 0;
+      renderCharacterRibbon();
+      loadCharacter();
+    }
+
+    function renderCharacterRibbon() {
+      characterRibbon.innerHTML = '';
+      filteredCharacters.forEach((item, index) => {
+        const btn = document.createElement('button');
+        btn.textContent = item.char;
+        btn.className = `w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-base sm:text-lg transition-all border-2 shrink-0 touch-manipulation ${
+          index === currentCharacterIndex
+            ? 'bg-indigo-600 text-white border-indigo-700 shadow-md scale-105'
+            : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 active:bg-indigo-50'
+        }`;
+        btn.addEventListener('click', () => {
+          initAudio();
+          currentCharacterIndex = index;
+          renderCharacterRibbon();
+          loadCharacter();
+          btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        });
+        characterRibbon.appendChild(btn);
+      });
+    }
+
+    // Set line zone highlighting according to character anatomy
+    function updateBandHighlights(band) {
+      bandUpper.setAttribute('fill-opacity', '0');
+      bandMiddle.setAttribute('fill-opacity', '0');
+      bandLower.setAttribute('fill-opacity', '0');
+
+      if (band === 'orta') {
+        bandMiddle.setAttribute('fill-opacity', '0.65');
+        zoneDescription.textContent = 'Orta Gövde Alanı (2 - 3. Çizgiler Arası)';
+      } else if (band === 'ust_orta') {
+        bandUpper.setAttribute('fill-opacity', '0.45');
+        bandMiddle.setAttribute('fill-opacity', '0.65');
+        zoneDescription.textContent = 'Üst ve Orta Alan (1 - 3. Çizgiler Arası)';
+      } else if (band === 'orta_alt') {
+        bandMiddle.setAttribute('fill-opacity', '0.65');
+        bandLower.setAttribute('fill-opacity', '0.45');
+        zoneDescription.textContent = 'Orta ve Alt Kuyruk Alanı (2 - 4. Çizgiler Arası)';
+      } else if (band === 'nokta') {
+        bandMiddle.setAttribute('fill-opacity', '0.35');
+        zoneDescription.textContent = 'Taban Çizgisi Üzerinde (3. Çizgi)';
+      }
+    }
+
+    // Load Character onto SVG canvas
+    function loadCharacter() {
+      const charObj = getActiveCharacter();
+      
+      // Update header details
+      activeCharAvatar.textContent = charObj.char;
+      updateBandHighlights(charObj.band);
+
+      // Clean SVG Dynamic Layers
+      ghostGroup.innerHTML = '';
+      inkGroup.innerHTML = '';
+      guidesGroup.innerHTML = '';
+      stepPathsList = [];
+
+      // Build Ghost, Ink, and Arrow elements
+      charObj.steps.forEach((step) => {
+        // Ghost line
+        const ghostPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        ghostPath.setAttribute('d', step.d);
+        ghostPath.setAttribute('class', 'ghost-stroke');
+        ghostGroup.appendChild(ghostPath);
+
+        // Active ink path
+        const inkPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        inkPath.setAttribute('d', step.d);
+        inkPath.setAttribute('class', 'active-ink');
+        const length = inkPath.getTotalLength();
+        inkPath.style.strokeDasharray = `${length}`;
+        inkPath.style.strokeDashoffset = `${length}`;
+        inkGroup.appendChild(inkPath);
+
+        stepPathsList.push({
+          element: inkPath,
+          length: length,
+          duration: step.duration,
+          stepData: step
+        });
+
+        // Direction Arrows & Step Numbers
+        if (step.num) {
+          const numCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          numCircle.setAttribute('cx', step.num.x);
+          numCircle.setAttribute('cy', step.num.y);
+          numCircle.setAttribute('r', '15');
+          numCircle.setAttribute('fill', step.num.color || '#ef4444');
+          numCircle.setAttribute('stroke', '#ffffff');
+          numCircle.setAttribute('stroke-width', '2.5');
+          guidesGroup.appendChild(numCircle);
+
+          const numText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          numText.setAttribute('x', step.num.x);
+          numText.setAttribute('y', step.num.y + 5);
+          numText.setAttribute('fill', '#ffffff');
+          numText.setAttribute('font-size', '13');
+          numText.setAttribute('font-weight', '900');
+          numText.setAttribute('text-anchor', 'middle');
+          numText.textContent = step.num.text;
+          guidesGroup.appendChild(numText);
+        }
+
+        if (step.arrow) {
+          const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          const endX = step.arrow.x + step.arrow.dx;
+          const endY = step.arrow.y + step.arrow.dy;
+          arrowPath.setAttribute('d', `M ${step.arrow.x},${step.arrow.y} L ${endX},${endY}`);
+          arrowPath.setAttribute('fill', 'none');
+          arrowPath.setAttribute('stroke', step.num.color || '#ef4444');
+          arrowPath.setAttribute('stroke-width', '3.5');
+          arrowPath.setAttribute('stroke-dasharray', '4 2');
+          arrowPath.setAttribute('marker-end', `url(#${step.arrow.marker || 'arrowRed'})`);
+          guidesGroup.appendChild(arrowPath);
+        }
+      });
+
+      guidesGroup.style.display = showGuidanceArrows ? 'block' : 'none';
+
+      // Reset animation to step 0
+      resetAnimationSequence();
+    }
+
+    function resetAnimationSequence() {
+      currentStepIndex = 0;
+      stepProgress = 0;
+      stateTimer = 0;
+      animState = 'drawing';
+
+      // Reset all stroke paths to hidden
+      stepPathsList.forEach(item => {
+        item.element.setAttribute('class', 'active-ink');
+        item.element.style.strokeDashoffset = `${item.length}`;
+      });
+
+      if (stepPathsList.length > 0) {
+        activePathElement = stepPathsList[0];
+        const startPt = activePathElement.element.getPointAtLength(0);
+        pencilTracer.setAttribute('transform', `translate(${startPt.x}, ${startPt.y})`);
+        pencilTracer.style.display = 'block';
+        playStepStartSound();
+      }
+    }
+
+    // Central Animation Loop
+    function animationLoop(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+      const deltaTime = (timestamp - lastTime) * speedFactor;
+      lastTime = timestamp;
+
+      if (isPlaying && stepPathsList.length > 0) {
+        if (animState === 'drawing') {
+          const currentItem = stepPathsList[currentStepIndex];
+          stepProgress += deltaTime / currentItem.duration;
+
+          if (stepProgress >= 1) {
+            stepProgress = 1;
+            currentItem.element.style.strokeDashoffset = '0';
+            currentItem.element.setAttribute('class', 'completed-ink');
+            playStepEndSound();
+
+            // Check if more steps exist
+            if (currentStepIndex < stepPathsList.length - 1) {
+              animState = 'pauseStep';
+              stateTimer = 0;
+            } else {
+              animState = 'finished';
+              stateTimer = 0;
+              playCharacterCompleteSound();
+            }
+          } else {
+            const currentOffset = currentItem.length * (1 - stepProgress);
+            currentItem.element.style.strokeDashoffset = `${currentOffset}`;
+            const pt = currentItem.element.getPointAtLength(currentItem.length * stepProgress);
+            pencilTracer.setAttribute('transform', `translate(${pt.x}, ${pt.y})`);
+          }
+        } 
+        else if (animState === 'pauseStep') {
+          stateTimer += deltaTime;
+          // Move pencil toward start point of next stroke to simulate lifting pencil
+          const nextItem = stepPathsList[currentStepIndex + 1];
+          const nextStartPt = nextItem.element.getPointAtLength(0);
+          pencilTracer.setAttribute('transform', `translate(${nextStartPt.x}, ${nextStartPt.y})`);
+
+          if (stateTimer >= PAUSE_BETWEEN_STEPS) {
+            currentStepIndex++;
+            stepProgress = 0;
+            animState = 'drawing';
+            playStepStartSound();
+          }
+        }
+        else if (animState === 'finished') {
+          stateTimer += deltaTime;
+          if (stateTimer >= PAUSE_BEFORE_LOOP) {
+            resetAnimationSequence();
+          }
+        }
+      }
+
+      requestAnimationFrame(animationLoop);
+    }
+
+    // Play/Pause State Toggle
+    function togglePlayState() {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        playBtnLabel.textContent = 'Durdur';
+        playPauseBtn.className = 'btn-press bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 sm:px-6 py-2.5 rounded-2xl shadow flex items-center gap-2 text-sm sm:text-base';
+        playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      } else {
+        playBtnLabel.textContent = 'Başlat';
+        playPauseBtn.className = 'btn-press bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-4 sm:px-6 py-2.5 rounded-2xl shadow flex items-center gap-2 text-sm sm:text-base';
+        playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+      }
+    }
+
+    // Play/Pause button
+    playPauseBtn.addEventListener('click', () => {
+      initAudio();
+      togglePlayState();
+    });
+
+    // Replay button
+    replayBtn.addEventListener('click', () => {
+      initAudio();
+      resetAnimationSequence();
+      if (!isPlaying) togglePlayState();
+    });
+
+    // Previous Character
+    prevCharBtn.addEventListener('click', () => {
+      initAudio();
+      if (currentCharacterIndex > 0) {
+        currentCharacterIndex--;
+      } else {
+        currentCharacterIndex = filteredCharacters.length - 1;
+      }
+      renderCharacterRibbon();
+      loadCharacter();
+    });
+
+    // Next Character
+    nextCharBtn.addEventListener('click', () => {
+      initAudio();
+      if (currentCharacterIndex < filteredCharacters.length - 1) {
+        currentCharacterIndex++;
+      } else {
+        currentCharacterIndex = 0;
+      }
+      renderCharacterRibbon();
+      loadCharacter();
+    });
+
+    // Category Tabs click
+    catTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        initAudio();
+        setCategory(tab.dataset.cat);
+      });
+    });
+
+    // Speed Selector buttons
+    speedButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        speedButtons.forEach(b => {
+          b.classList.remove('bg-white', 'text-indigo-700', 'shadow-sm');
+          b.classList.add('text-slate-600');
+        });
+        btn.classList.add('bg-white', 'text-indigo-700', 'shadow-sm');
+        btn.classList.remove('text-slate-600');
+        speedFactor = parseFloat(btn.dataset.speed);
+      });
+    });
+
+    // Guidance Arrows Toggle
+    toggleArrowsBtn.addEventListener('click', () => {
+      showGuidanceArrows = !showGuidanceArrows;
+      guidesGroup.style.display = showGuidanceArrows ? 'block' : 'none';
+      if (showGuidanceArrows) {
+        arrowsBtnText.textContent = "Okları Gizle";
+        toggleArrowsBtn.classList.add('bg-slate-200');
+      } else {
+        arrowsBtnText.textContent = "Okları Göster";
+        toggleArrowsBtn.classList.remove('bg-slate-200');
+      }
+    });
+
+    // Sound Toggle
+    audioToggleBtn.addEventListener('click', () => {
+      initAudio();
+      isSoundMuted = !isSoundMuted;
+      if (isSoundMuted) {
+        soundLabel.textContent = "Ses: Kapalı";
+        audioToggleBtn.classList.remove('bg-amber-50', 'text-amber-900', 'border-amber-300');
+        audioToggleBtn.classList.add('bg-slate-100', 'text-slate-500', 'border-slate-300');
+      } else {
+        soundLabel.textContent = "Ses: Açık";
+        audioToggleBtn.classList.add('bg-amber-50', 'text-amber-900', 'border-amber-300');
+        audioToggleBtn.classList.remove('bg-slate-100', 'text-slate-500', 'border-slate-300');
+      }
+    });
+
+    // Fullscreen support for Smart Board
+    fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn("Fullscreen request error", err);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlayState();
+      } else if (e.code === 'KeyR') {
+        resetAnimationSequence();
+        if (!isPlaying) togglePlayState();
+      } else if (e.code === 'ArrowLeft') {
+        prevCharBtn.click();
+      } else if (e.code === 'ArrowRight') {
+        nextCharBtn.click();
+      }
+    });
+
+    // STUDENT PRACTICE (SEN DE ÇİZ) DRAWING SYSTEM
+    const canvasContext = practiceCanvas.getContext('2d');
+    let isPracticeMode = false;
+    let isDrawing = false;
+    let activePenColor = '#dc2626';
+
+    function resizePracticeCanvas() {
+      const rect = practiceCanvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = window.devicePixelRatio || 1;
+      practiceCanvas.width = rect.width * dpr;
+      practiceCanvas.height = rect.height * dpr;
+      canvasContext.scale(dpr, dpr);
+    }
+
+    window.addEventListener('resize', () => {
+      if (isPracticeMode) resizePracticeCanvas();
+    });
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => {
+        if (isPracticeMode) resizePracticeCanvas();
+      }, 200);
+    });
+
+    practiceToggleBtn.addEventListener('click', () => {
+      initAudio();
+      isPracticeMode = !isPracticeMode;
+      if (isPracticeMode) {
+        resizePracticeCanvas();
+        practiceCanvas.classList.remove('pointer-events-none', 'opacity-0');
+        practiceCanvas.classList.add('pointer-events-auto', 'opacity-100');
+        practiceDrawingTools.classList.remove('hidden');
+        practiceDrawingTools.classList.add('flex');
+        practiceBanner.classList.remove('hidden');
+        practiceBanner.classList.add('flex');
+        
+        practiceToggleLabel.textContent = "Animasyon";
+        practiceToggleBtn.classList.remove('bg-amber-400', 'hover:bg-amber-500', 'border-amber-500');
+        practiceToggleBtn.classList.add('bg-slate-200', 'hover:bg-slate-300', 'text-slate-800', 'border-slate-400');
+
+        if (isPlaying) togglePlayState();
+      } else {
+        practiceCanvas.classList.add('pointer-events-none', 'opacity-0');
+        practiceCanvas.classList.remove('pointer-events-auto', 'opacity-100');
+        practiceDrawingTools.classList.add('hidden');
+        practiceDrawingTools.classList.remove('flex');
+        practiceBanner.classList.add('hidden');
+        practiceBanner.classList.remove('flex');
+
+        practiceToggleLabel.textContent = "Sen de Çiz";
+        practiceToggleBtn.classList.add('bg-amber-400', 'hover:bg-amber-500', 'border-amber-500');
+        practiceToggleBtn.classList.remove('bg-slate-200', 'hover:bg-slate-300', 'text-slate-800', 'border-slate-400');
+
+        if (!isPlaying) togglePlayState();
+      }
+    });
+
+    // Pen color picker
+    penColorButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        penColorButtons.forEach(b => b.classList.remove('ring-2', 'ring-offset-1', 'ring-slate-700'));
+        activePenColor = btn.dataset.penColor;
+        btn.classList.add('ring-2', 'ring-offset-1', 'ring-slate-700');
+      });
+    });
+
+    // Clear student drawing canvas
+    clearCanvasBtn.addEventListener('click', () => {
+      const rect = practiceCanvas.getBoundingClientRect();
+      canvasContext.clearRect(0, 0, rect.width, rect.height);
+      playTone(330, 'sine', 0.15, 0.1);
+    });
+
+    // Touch & Pointer Coordinates Calculator
+    function getCanvasCoordinates(e) {
+      const rect = practiceCanvas.getBoundingClientRect();
+      let clientX = e.clientX;
+      let clientY = e.clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      }
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    function onPointerDown(e) {
+      if (!isPracticeMode) return;
+      if (e.cancelable) e.preventDefault();
+      isDrawing = true;
+      const pos = getCanvasCoordinates(e);
+      canvasContext.beginPath();
+      canvasContext.moveTo(pos.x, pos.y);
+      canvasContext.strokeStyle = activePenColor;
+      canvasContext.lineWidth = window.innerWidth < 640 ? 10 : 15;
+      canvasContext.lineCap = 'round';
+      canvasContext.lineJoin = 'round';
+      playTone(520, 'sine', 0.08, 0.05);
+    }
+
+    function onPointerMove(e) {
+      if (!isDrawing || !isPracticeMode) return;
+      if (e.cancelable) e.preventDefault();
+      const pos = getCanvasCoordinates(e);
+      canvasContext.lineTo(pos.x, pos.y);
+      canvasContext.stroke();
+    }
+
+    function onPointerUp(e) {
+      if (isDrawing) {
+        isDrawing = false;
+      }
+    }
+
+    practiceCanvas.addEventListener('mousedown', onPointerDown);
+    practiceCanvas.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    practiceCanvas.addEventListener('touchstart', onPointerDown, { passive: false });
+    practiceCanvas.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
+    practiceCanvas.addEventListener('touchcancel', onPointerUp);
+
+    // Bootstrap initial app state
+    setCategory('kucuk');
+    requestAnimationFrame(animationLoop);
+  </script>
+</body>
+</html>
